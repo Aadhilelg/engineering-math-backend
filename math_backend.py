@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sympy as sp
-from sympy import symbols, diff, integrate, solve, limit, series
+# Import Eq (for equations) and other needed symbols
+from sympy import symbols, diff, integrate, solve, limit, series, Eq
 import re
 
 app = Flask(__name__)
@@ -66,20 +67,34 @@ def solve_math():
             }
             
         elif parsed['type'] == 'solve':
-            # Simple equation solving
-            equation = sp.sympify(parsed['expression'])
-            solution = solve(equation, x)
-            result = {
-                'steps': [
-                    f'Problem: {equation}',
-                    f'Step 1: Solve for x',
-                    f'Step 2: Solution set',
-                    f'Final Answer: {solution}'
-                ],
-                'answer': str(solution)
-            }
+            # ✅ FIXED LOGIC FOR SOLVING EQUATIONS
+            try:
+                # Split equation at '='
+                parts = parsed['expression'].split('=')
+                if len(parts) != 2:
+                    raise ValueError("Invalid equation")
+                
+                # Sympify Left Hand Side (LHS) and Right Hand Side (RHS)
+                lhs = sp.sympify(parts[0])
+                rhs = sp.sympify(parts[1])
+                
+                # Create a SymPy Equation object
+                equation = Eq(lhs, rhs)
+                
+                solution = solve(equation, x)
+                result = {
+                    'steps': [
+                        f'Problem: Solve {equation}',
+                        f'Step 1: Isolate variable x',
+                        f'Step 2: Solution set for x',
+                        f'Final Answer: {solution}'
+                    ],
+                    'answer': str(solution)
+                }
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'Invalid equation syntax: {e}'})
             
-        else:
+        else: # Simplify
             expr = sp.sympify(parsed['expression'])
             simplified = sp.simplify(expr)
             result = {
@@ -94,7 +109,8 @@ def solve_math():
         return jsonify({'success': True, 'result': result})
         
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        # Catch any other errors (like "x**" is invalid syntax)
+        return jsonify({'success': False, 'error': f'Invalid syntax: {e}'})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
